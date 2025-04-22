@@ -1,0 +1,14 @@
+[project]
+name = "conversation-states"
+version = "0.1.0"
+description = "Shared models for LangGraph state"
+authors = [{name = "Victor Diukov"}]
+dependencies = [
+    "pydantic>=2.0",
+    "langgraph",
+    "langchain-core"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
