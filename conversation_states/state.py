@@ -1,6 +1,6 @@
 from langgraph.graph import add_messages, MessagesState
 from langchain_core.messages import AIMessage, AnyMessage, BaseMessage, RemoveMessage
-from typing import Literal, Optional, Annotated
+from typing import Literal, Optional, Annotated, TypedDict
 from datetime import datetime
 from pydantic import BaseModel, Field
 
@@ -8,10 +8,11 @@ from pydantic import BaseModel, Field
 ContentType = Literal["text", "code", "alert"]
 ActionType = Literal["image", "gif", "audio", "voice", "reaction", "sticker"]
 Reaction = Literal[
-    "👍", "❤️", "😂", "🔥", "🥰",
-    "👏", "😢", "😮", "🤔", "🎉",
-    "🤯", "💩", "🙏", "💯", "😎",
-    "👀", "🤡", "😐", "🤬", "🥺"
+    "👍", "👎", "❤", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢", "🎉", "🤩", "🤮", 
+    "💩", "🙏", "👌", "🕊", "🤡", "🥱", "🥴", "😍", "🐳", "❤‍🔥", "🌚", "🌭", "💯", "🤣", "⚡", 
+    "🍌", "🏆", "💔", "🤨", "😐", "🍓", "🍾", "💋", "🖕", "😈", "😴", "😭", "🤓", "👻", "👨‍💻", 
+    "👀", "🎃", "🙈", "😇", "😨", "🤝", "✍", "🤗", "🫡", "🎅", "🎄",  "☃", "💅", "🤪", "🗿", 
+    "🆒", "💘", "🙉", "🦄", "😘","💊", "🙊", "😎", "👾", "🤷‍♂", "🤷", "🤷‍♀", "😡"
 ]
 Status = Literal["pending"]
 
@@ -19,9 +20,6 @@ Status = Literal["pending"]
 class Action(BaseModel):
     type: ActionType
     value: str
-    timestamp: datetime
-    status: Status = "pending"
-    message_id: Optional[str] = None
 
 
 class Human(BaseModel):
@@ -32,7 +30,7 @@ class Human(BaseModel):
     preferences: str
 
 
-class OverallState(BaseModel):
+class OverallState(TypedDict):
     messages: Annotated[list[AnyMessage], add_messages]
     summary: Optional[str] = None
     actions: list[Action] = Field(default_factory=list)
