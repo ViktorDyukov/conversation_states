@@ -68,7 +68,7 @@ class OverallState(BaseModel):
         self.users = []
         return
 
-    def count_tokens(text: str) -> int:
+    def count_tokens(self, text: str) -> int:
         return len(tokenizer.encode(text))
 
     def summarize_overall_state(self) -> str:
