@@ -21,22 +21,21 @@ Reaction = Literal[
 class Action(BaseModel):
     type: ActionType
     value: str
-    writer: StreamWriter
-    
+
 
 class ActionSender:
+    writer: StreamWriter
+
     def __init__(self, writer: StreamWriter):
         self.writer = writer
 
     def send_action(self, action: Action):
         self.writer({"actions": [action.dict()]})
 
-    def add_reaction(self, reaction: Reaction, message_id: str):
+    def send_reaction(self, reaction: Reaction):
         action = Action(
             type="reaction",
-            value=reaction,
-            message_id=message_id,
-            timestamp=datetime.now()
+            value=reaction
         )
         self.send_action(action)
 
@@ -59,14 +58,6 @@ class OverallState(BaseModel):
         super().__init__(**kwargs)
         if not hasattr(self, "messages"):
             self.messages = []
-
-    def add_reaction(self, reaction: Reaction, message_id: str):
-        self.actions.append(Action(
-            type="reaction",
-            value=reaction,
-            timestamp=datetime.now(),
-            message_id=message_id
-        ))
 
     def clear_state(self):
         removed = [RemoveMessage(id=m.id)
