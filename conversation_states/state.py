@@ -71,10 +71,10 @@ class OverallState(BaseModel):
     def count_tokens(text: str) -> int:
         return len(tokenizer.encode(text))
 
-    def summarize_overall_state(state: OverallState) -> str:
+    def summarize_overall_state(self) -> str:
         # 1. Users
         user_lines = []
-        for u in state.users:
+        for u in self.users:
             name_line = f"{u.first_name} {u.last_name} (@{u.messenger_id})"
             user_lines.append(
                 f"- {name_line}\n"
@@ -87,7 +87,7 @@ class OverallState(BaseModel):
         # 2. Messages
         messages_block = []
         total_msg_tokens = 0
-        for msg in state.messages:
+        for msg in self.messages:
             tokens = count_tokens(msg.content)
             total_msg_tokens += tokens
             text = msg.content.strip().replace("\n", " ")
@@ -96,13 +96,13 @@ class OverallState(BaseModel):
                 f"- {'User' if msg.role == 'human' else 'Assistant'}: {preview} ({tokens} tokens)")
 
         # 3. Summary
-        summary_text = state.summary or "(No summary provided)"
+        summary_text = self.summary or "(No summary provided)"
         summary_tokens = count_tokens(summary_text)
         summary_block = f"📝 Summary ({summary_tokens} tokens):\n{summary_text}"
 
         return (
             f"{users_block}\n\n"
-            f"💬 Messages: {len(state.messages)} total, {total_msg_tokens} tokens\n"
+            f"💬 Messages: {len(self.messages)} total, {total_msg_tokens} tokens\n"
             + "\n".join(messages_block)
             + "\n\n"
             + summary_block
