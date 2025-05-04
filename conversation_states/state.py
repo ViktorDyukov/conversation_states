@@ -4,11 +4,11 @@ from typing import Literal, Optional, Annotated
 from datetime import datetime
 from pydantic import BaseModel, Field
 import tiktoken
+from langgraph.types import StreamWriter
 
 
-
-ContentType = Literal["text", "code", "alert"]
-ActionType = Literal["image", "gif", "audio", "voice", "reaction", "sticker"]
+ActionType = Literal["image", "gif", "voice", "reaction",
+                     "sticker", "system-message", "system-notification"]
 Reaction = Literal[
     "👍", "👎", "❤", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢", "🎉", "🤩", "🤮",
     "💩", "🙏", "👌", "🕊", "🤡", "🥱", "🥴", "😍", "🐳", "❤‍🔥", "🌚", "🌭", "💯", "🤣", "⚡",
@@ -16,12 +16,29 @@ Reaction = Literal[
     "👀", "🎃", "🙈", "😇", "😨", "🤝", "✍", "🤗", "🫡", "🎅", "🎄",  "☃", "💅", "🤪", "🗿",
     "🆒", "💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂", "🤷", "🤷‍♀", "😡"
 ]
-Status = Literal["pending"]
 
 
 class Action(BaseModel):
     type: ActionType
     value: str
+    writer: StreamWriter
+    
+
+class ActionSender:
+    def __init__(self, writer: StreamWriter):
+        self.writer = writer
+
+    def send_action(self, action: Action):
+        self.writer({"actions": [action.dict()]})
+
+    def add_reaction(self, reaction: Reaction, message_id: str):
+        action = Action(
+            type="reaction",
+            value=reaction,
+            message_id=message_id,
+            timestamp=datetime.now()
+        )
+        self.send_action(action)
 
 
 class Human(BaseModel):
