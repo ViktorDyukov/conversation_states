@@ -88,7 +88,7 @@ class OverallState(BaseModel):
         messages_block = []
         total_msg_tokens = 0
         for msg in self.messages:
-            tokens = count_tokens(msg.content)
+            tokens = self.count_tokens(msg.content)
             total_msg_tokens += tokens
             text = msg.content.strip().replace("\n", " ")
             preview = (text[:100] + "...") if len(text) > 100 else text
@@ -97,7 +97,7 @@ class OverallState(BaseModel):
 
         # 3. Summary
         summary_text = self.summary or "(No summary provided)"
-        summary_tokens = count_tokens(summary_text)
+        summary_tokens = self.count_tokens(summary_text)
         summary_block = f"📝 Summary ({summary_tokens} tokens):\n{summary_text}"
 
         return (
