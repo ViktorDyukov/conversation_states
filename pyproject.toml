@@ -1,6 +1,6 @@
 [project]
 name = "conversation-states"
-version = "0.1.1"
+version = "0.1.2"
 description = "Shared models for LangGraph state"
 authors = [{name = "Victor Diukov"}]
 dependencies = [
