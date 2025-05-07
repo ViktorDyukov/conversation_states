@@ -115,29 +115,48 @@ class OverallState(BaseModel):
                 f"  - preferred_name: {u.preffered_name or 'not provided'}\n"
                 f"  - preferences: {u.preferences or 'not provided'}"
             )
-        users_block = "👤 Users:\n"
-        "\n".join(user_lines) if user_lines else "👤 Users: none"
+        users_block = "👤 Users:\n" + \
+            "\n".join(user_lines) if user_lines else "👤 Users: none"
 
         # 2. Messages
         messages_block = []
         total_msg_tokens = 0
+
         for msg in self.messages:
+            role = self.get_role(msg)
             tokens = self.count_tokens(msg.content)
             total_msg_tokens += tokens
-            text = msg.content.strip().replace("\n", " ")
-            preview = (text[:100] + "...") if len(text) > 100 else text
-            messages_block.append(
-                f"- {'User' if self.get_role(msg) == 'human' else 'Assistant'}: {preview} ({tokens} tokens)")
+
+            if role == "ai" and "tool_calls" in msg.additional_kwargs:
+                for call in msg.additional_kwargs["tool_calls"]:
+                    func_name = call.get("function", {}).get("name", "unknown")
+                    args = call.get("function", {}).get("arguments", "{}")
+                    messages_block.append(
+                        f"- Assistant called tool: `{func_name}` with `{args}`")
+                if msg.content.strip():  # Если есть текст, тоже покажем
+                    text = msg.content.strip().replace("\n", " ")
+                    preview = (text[:100] + "...") if len(text) > 100 else text
+                    messages_block.append(
+                        f"- Assistant: {preview} ({tokens} tokens)")
+            elif role == "tool":
+                tool_name = getattr(msg, "name", "unknown")
+                text = msg.content.strip().replace("\n", " ")
+                preview = (text[:100] + "...") if len(text) > 100 else text
+                messages_block.append(
+                    f"- Tool ({tool_name}): {preview} ({tokens} tokens)")
+            else:
+                role_label = "User" if role == "human" else "Assistant"
+                text = msg.content.strip().replace("\n", " ")
+                preview = (text[:100] + "...") if len(text) > 100 else text
+                messages_block.append(
+                    f"- {role_label}: {preview} ({tokens} tokens)")
 
         # 3. Summary
-        if self.summary:
-            summary_text = self.summary
-            summary_tokens = self.count_tokens(summary_text)
-        else:
-            summary_text = "(No summary provided)"
-            summary_tokens = 0
+        summary_text = self.summary.strip() if self.summary else "(No summary provided)"
+        summary_tokens = self.count_tokens(summary_text)
         summary_block = f"📝 Summary ({summary_tokens} tokens):\n{summary_text}"
 
+        # Final output
         return (
             f"{users_block}\n\n"
             f"Messages: {len(self.messages)} total, {total_msg_tokens} tokens\n"
@@ -150,7 +169,7 @@ class OverallState(BaseModel):
         if not self.messages:
             return "No messages available."
 
-        # Группируем сообщения в цепочки
+        # Группировка в ходы
         turns = []
         current_turn = []
 
@@ -176,11 +195,9 @@ class OverallState(BaseModel):
 
         for msg in last_turn:
             role = self.get_role(msg)
-            text = msg.content.strip().replace("\n", " ")
             tokens = self.count_tokens(msg.content)
             total_tokens += tokens
 
-            preview = (text[:200] + "...") if len(text) > 200 else text
             prefix = {
                 "human": "👤 User",
                 "ai": "🤖 Assistant",
@@ -189,7 +206,26 @@ class OverallState(BaseModel):
                 "system": "⚙️ System"
             }.get(role, f"🔹 {role}")
 
-            lines.append(f"{prefix} ({tokens} tokens):\n{preview}")
+            # Показываем вызов тула отдельно
+            if role == "ai" and "tool_calls" in msg.additional_kwargs:
+                for call in msg.additional_kwargs["tool_calls"]:
+                    func_name = call.get("function", {}).get("name", "unknown")
+                    args = call.get("function", {}).get("arguments", "{}")
+                    lines.append(
+                        f"🤖 Assistant called tool: `{func_name}` with `{args}`")
+                # Если сам контент пустой — пропускаем его
+                if msg.content.strip():
+                    preview = msg.content.strip().replace("\n", " ")
+                    preview = (preview[:200] +
+                               "...") if len(preview) > 200 else preview
+                    lines.append(f"{prefix} ({tokens} tokens):\n{preview}")
+            elif role == "tool":
+                tool_output = msg.content.strip().replace("\n", " ")
+                lines.append(f"{prefix} ({tokens} tokens):\n{tool_output}")
+            else:
+                text = msg.content.strip().replace("\n", " ")
+                preview = (text[:200] + "...") if len(text) > 200 else text
+                lines.append(f"{prefix} ({tokens} tokens):\n{preview}")
 
         return (
             f"🧵 Last turn ({len(last_turn)} messages, {total_tokens} tokens):\n\n"
