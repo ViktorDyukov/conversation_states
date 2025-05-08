@@ -1,4 +1,5 @@
 from langgraph.graph import add_messages, MessagesState
+from operator import add
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
@@ -16,7 +17,7 @@ from langchain_core.messages import (
     AnyMessage,
     RemoveMessage,
 )
-from typing import Literal, Optional, Annotated, Union
+from typing import Literal, Optional, Annotated, Union, Dict
 from datetime import datetime
 from pydantic import BaseModel, Field
 import tiktoken
@@ -58,18 +59,18 @@ class ActionSender:
 
 
 class Human(BaseModel):
-    messenger_id: str
+    username: str
     first_name: str
-    last_name: str
-    preffered_name: str
-    preferences: str
+    last_name: Optional[str] = None
+    preffered_name: Optional[str] = None
+    information: Dict[str, str] = Field(default_factory=dict)
 
 
 class OverallState(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
     summary: Optional[str] = None
     actions: list[Action] = Field(default_factory=list)
-    users: list[Human] = Field(default_factory=list)
+    users: Annotated[list[Human], add] = Field(default_factory=list)
 
     model_config = {
         "arbitrary_types_allowed": True
@@ -109,11 +110,11 @@ class OverallState(BaseModel):
         # 1. Users
         user_lines = []
         for u in self.users:
-            name_line = f"{u.first_name} {u.last_name} (@{u.messenger_id})"
+            name_line = f"{u.first_name} {u.last_name} ({u.username})"
             user_lines.append(
                 f"- {name_line}\n"
                 f"  - preferred_name: {u.preffered_name or 'not provided'}\n"
-                f"  - preferences: {u.preferences or 'not provided'}"
+                f"  - info: {u.information or 'not provided'}"
             )
         users_block = "👤 Users:\n" + \
             "\n".join(user_lines) if user_lines else "👤 Users: none"
@@ -236,3 +237,9 @@ class OverallState(BaseModel):
         last = self.messages[-1]
         self.messages = [RemoveMessage(id=last.id)]
         return
+
+    def get_last_message(self):
+        return self.messages[-1]
+
+    def has_user_with_username(self, username) -> bool:
+        return any(u.username == username for u in self.users)
