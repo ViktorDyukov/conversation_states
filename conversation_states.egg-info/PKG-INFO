@@ -3,7 +3,8 @@ Name: conversation-states
 Version: 0.1.1
 Summary: Shared models for LangGraph state
 Author: Victor Diukov
-Requires-Dist: pydantic>=2.0
-Requires-Dist: langgraph
-Requires-Dist: langchain-core
-Requires-Dist: tiktoken
+Requires-Dist:
+  - pydantic>=2.0
+  - langgraph
+  - langchain-core
+  - tiktoken

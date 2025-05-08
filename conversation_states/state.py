@@ -63,14 +63,20 @@ class Human(BaseModel):
     first_name: str
     last_name: Optional[str] = None
     preffered_name: Optional[str] = None
-    information: Dict[str, str] = Field(default_factory=dict)
+    information: Dict = Field(default_factory=dict)
+
+    @staticmethod
+    def add_user(left: list["Human"], right: list["Human"]) -> list["Human"]:
+        existing_ids = {u.username for u in left}
+        return left + [u for u in right if u.username not in existing_ids]
 
 
 class OverallState(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
     summary: Optional[str] = None
     actions: list[Action] = Field(default_factory=list)
-    users: Annotated[list[Human], add] = Field(default_factory=list)
+    users: Annotated[list[Human], Human.add_user] = Field(
+        default_factory=list)
 
     model_config = {
         "arbitrary_types_allowed": True
