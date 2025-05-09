@@ -3,18 +3,9 @@ from operator import add
 from langchain_core.messages import (
     AIMessage,
     HumanMessage,
-    ChatMessage,
     SystemMessage,
-    FunctionMessage,
     ToolMessage,
-    AIMessageChunk,
-    HumanMessageChunk,
-    ChatMessageChunk,
-    SystemMessageChunk,
-    FunctionMessageChunk,
-    ToolMessageChunk,
     BaseMessage,
-    AnyMessage,
     RemoveMessage,
 )
 from typing import Literal, Optional, Annotated, Union, Dict
@@ -67,6 +58,11 @@ class Human(BaseModel):
 
     @staticmethod
     def add_user(left: list["Human"], right: list["Human"]) -> list["Human"]:
+        right = [u if isinstance(u, Human) else Human(**u)
+                 for u in right or []]
+        print(f"left: {left}")
+        print(f"right: {right}")
+
         existing_ids = {u.username for u in left}
         return left + [u for u in right if u.username not in existing_ids]
 
@@ -79,6 +75,7 @@ class OverallState(BaseModel):
         default_factory=list)
 
     model_config = {
+        "exclude_none": True,
         "arbitrary_types_allowed": True
     }
 
@@ -246,6 +243,13 @@ class OverallState(BaseModel):
 
     def get_last_message(self):
         return self.messages[-1]
+
+    def get_sender(self) -> Human:
+        last_message = self.get_last_message()
+        return next(
+            u for u in self.users
+            if getattr(last_message, "sender", None) == u.username
+        )
 
     def has_user_with_username(self, username) -> bool:
         return any(u.username == username for u in self.users)
