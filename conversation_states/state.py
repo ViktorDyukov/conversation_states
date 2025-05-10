@@ -110,7 +110,7 @@ class OverallState(BaseModel):
                    for m in self.messages if hasattr(m, "id") and m.id]
         self.messages = removed
         self.summary = ""
-        self.users = []
+        self.users = "__REMOVE__"
         return
 
     def count_tokens(self, msg) -> int:
