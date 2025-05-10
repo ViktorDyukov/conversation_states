@@ -53,7 +53,7 @@ class Human(BaseModel):
     username: str
     first_name: str
     last_name: Optional[str] = None
-    preffered_name: Optional[str] = None
+    preferred_name: Optional[str] = None
     information: Dict = Field(default_factory=dict)
 
     @staticmethod
@@ -116,7 +116,7 @@ class OverallState(BaseModel):
             name_line = f"{u.first_name} {u.last_name} ({u.username})"
             user_lines.append(
                 f"- {name_line}\n"
-                f"  - preferred_name: {u.preffered_name or 'not provided'}\n"
+                f"  - preferred_name: {u.preferred_name or 'not provided'}\n"
                 f"  - info: {u.information or 'not provided'}"
             )
         users_block = "👤 Users:\n" + \
