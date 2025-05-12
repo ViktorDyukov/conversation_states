@@ -56,12 +56,6 @@ class MessageHistory(BaseModel):
                     f"Item {i} has invalid type: {type(msg).__name__}")
         return cls(items=items)
 
-    def model_post_init(self, __context):
-        for m in self.items:
-            print("→", m)
-            print("→ type:", getattr(m, "type", "???"))
-            print("→ class:", type(m))
-
     @field_validator("items")
     @classmethod
     def check_all_messages_valid(cls, v):

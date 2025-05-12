@@ -45,10 +45,6 @@ class ExternalState(BaseModel):
 
     @classmethod
     def from_internal(cls, internal: "InternalState", assistant_message: "AIMessage") -> "ExternalState":
-        print(*internal.external_messages.items)
-        print(type(*internal.external_messages.items))
-        print(assistant_message)
-        print(type(assistant_message))
 
         return cls(
             messages=MessageHistory(
