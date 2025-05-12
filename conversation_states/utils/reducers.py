@@ -9,6 +9,7 @@ def add_summary(a: Optional[str], b: Optional[str]) -> Optional[str]:
         return b
     if b is None:
         return a
+
     return b
 
 
