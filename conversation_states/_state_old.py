@@ -18,81 +18,41 @@ from langchain_core.messages import BaseMessage
 from langchain_core.messages import trim_messages
 from langchain_openai import ChatOpenAI
 
+# TODO
+# split into internal and external states
 
-def add_summary(a: Optional[str], b: Optional[str]) -> Optional[str]:
-    if a is None and b is None:
-        return None
-    if a is None:
-        return b
-    if b is None:
-        return a
-    return b
+# external
+# - full user list
+# - Should have only assistant and human messages
+# - previous internal iteration (without ext message history)
+# - full message history
+# - external.from_internal()
 
+# internal
+# - full user list
+# - Should have all iterations between the models with the names
+# - Only trimmed messages that are needed to use
+# - Summary
+# - previous internal iteration (without ext message history)
+# - internal.from_external()
 
-def add_user(left: list["Human"], right: list["Human"]) -> list["Human"]:
-    right = [u if isinstance(u, Human) else Human(**u)
-             for u in right or []]
-
-    existing_ids = {u.username for u in left}
-    return left + [u for u in right if u.username not in existing_ids]
-
-
-RoleLiteral = Literal["human", "ai", "tool", "system", "unknown"]
-
-
-ActionType = Literal["image", "gif", "voice", "reaction",
-                     "sticker", "system-message", "system-notification"]
-Reaction = Literal[
-    "👍", "👎", "❤", "🔥", "🥰", "👏", "😁", "🤔", "🤯", "😱", "🤬", "😢", "🎉", "🤩", "🤮",
-    "💩", "🙏", "👌", "🕊", "🤡", "🥱", "🥴", "😍", "🐳", "❤‍🔥", "🌚", "🌭", "💯", "🤣", "⚡",
-    "🍌", "🏆", "💔", "🤨", "😐", "🍓", "🍾", "💋", "🖕", "😈", "😴", "😭", "🤓", "👻", "👨‍💻",
-    "👀", "🎃", "🙈", "😇", "😨", "🤝", "✍", "🤗", "🫡", "🎅", "🎄",  "☃", "💅", "🤪", "🗿",
-    "🆒", "💘", "🙉", "🦄", "😘", "💊", "🙊", "😎", "👾", "🤷‍♂", "🤷", "🤷‍♀", "😡"
-]
+# flow
+# - TG uses ExternalState
+# - messenger -> first node - convert ext -> int - update user list, take the trimmed message history, take the last summary from the previous internal state saved
+# - preprocessing - generate instruction (user list, history, summary as a part of system message)
+# - stream text assistant response
+# - post processing - generate new summary (less trimmed messages), update user profile (last 3 messages from trimmed as a part of system message)
+# - internal -> external - add text assistant response, save internal as last turn internal, update user data
 
 
-class Action(BaseModel):
-    type: ActionType
-    value: str
 
 
-class ActionSender:
-    writer: StreamWriter
 
-    def __init__(self, writer: StreamWriter):
-        self.writer = writer
-
-    def send_action(self, action: Action):
-        self.writer({"actions": [action.dict()]})
-
-    def send_reaction(self, reaction: Reaction):
-        action = Action(
-            type="reaction",
-            value=reaction
-        )
-        self.send_action(action)
-
-
-class Human(BaseModel):
-    username: str
-    first_name: str
-    last_name: Optional[str] = None
-    preferred_name: Optional[str] = None
-    information: Dict = Field(default_factory=dict)
-
-    def update_info(self, updates: dict[str, str] | list[dict[str, str]]) -> None:
-        if isinstance(updates, dict):
-            updates = [updates]
-
-        for pair in updates:
-            for key, value in pair.items():
-                if value:
-                    self.information[key] = value  # Add or update
-                elif key in self.information:
-                    # Remove existing if value is empty
-                    del self.information[key]
-                # else: ignore non-existent empty key
-
+#####
+#####
+#####
+#####
+#####
 
 class OverallState(BaseModel):
     messages: Annotated[list[BaseMessage], add_messages]
