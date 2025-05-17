@@ -1,15 +1,19 @@
 from typing import Annotated, List, Optional
 from pydantic import BaseModel, Field
-from langchain_core.messages import BaseMessage, RemoveMessage, trim_messages
+from langchain_core.messages import BaseMessage, RemoveMessage, trim_messages, AnyMessage
+from langgraph.graph import add_messages, MessagesState
+
 import tiktoken
 from .humans import Human
-from .messages import MessageHistory
+# from .messages import MessageHistory
 from .utils.reducers import add_user, add_summary
 
 
 class InternalState(BaseModel):
-    reasoning_messages: MessageHistory
-    external_messages: MessageHistory
+    reasoning_messages: Annotated[List[AnyMessage], add_messages] = Field(
+        default_factory=list)
+    external_messages: Annotated[List[AnyMessage], add_messages] = Field(
+        default_factory=list)
     last_external_message: BaseMessage
     users: Annotated[list[Human], add_user] = Field(default_factory=list)
     last_sender: Human
@@ -21,34 +25,28 @@ class InternalState(BaseModel):
         sender = external.messages.sender(external.users)
 
         return cls(
-            reasoning_messages=MessageHistory(items=[]),
+            reasoning_messages=[],
             summary=external.summary,
             users=list(external.users),
-            external_messages=MessageHistory(
-                items=list(external.messages.items)),
+            external_messages=external.messages,
             last_external_message=last_message,
             last_sender=sender
         )
 
 
 class ExternalState(BaseModel):
-    messages: MessageHistory
+    messages: Annotated[List[AnyMessage], add_messages] = Field(
+        default_factory=list)
     users: Annotated[list[Human], add_user] = Field(
         default_factory=list)
     summary: str = ""
     last_internal_state: Optional[InternalState] = None
 
-    model_config = {
-        "exclude_none": True,
-        "arbitrary_types_allowed": True
-    }
-
     @classmethod
     def from_internal(cls, internal: "InternalState", assistant_message: "AIMessage") -> "ExternalState":
 
         return cls(
-            messages=MessageHistory(
-                items=[*internal.external_messages.items, assistant_message]),
+            messages=[*internal.external_messages, assistant_message],
             users=list(internal.users),
             summary=internal.summary,
             last_internal_state=internal
