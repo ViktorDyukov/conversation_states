@@ -41,119 +41,102 @@ def get_role(msg: BaseMessage) -> RoleLiteral:
     return "unknown"
 
 
-MessageTypes = Annotated[
-    Union[
-        Annotated[AIMessage, Tag(tag="ai")],
-        Annotated[HumanMessage, Tag(tag="human")],
-        Annotated[SystemMessage, Tag(tag="system")],
-        Annotated[ToolMessage, Tag(tag="tool")],
-    ],
-    Field(discriminator=Discriminator(_get_type)),
-]
+class MessageAPI:
+    def __init__(self, state: BaseModel, field_name: str):
+        self._state = state
+        self._field_name = field_name
 
+    @property
+    def items(self) -> List[AnyMessage]:
+        return getattr(self._state, self._field_name)
 
-# class MessageHistory(BaseModel):
-#     items: Annotated[list[AnyMessage], add_messages]
+    def as_pretty(self, technical: bool = False, truncate: Optional[int] = None) -> str:
+        total_tokens = 0
+        lines = []
 
-#     model_config = {
-#         "exclude_none": True,
-#         "arbitrary_types_allowed": True
-#     }
+        for msg in self.items:
+            role = msg.type
+            name = getattr(msg, "name", None)
+            at_name = f"@{name}" if name else ""
 
-#     def as_pretty(
-#         self,
-#         technical: bool = False,
-#         truncate: Optional[int] = None
-#     ) -> str:
-#         total_tokens = 0
-#         lines = []
+            prefix = {
+                "human": f"👤 User {at_name}",
+                "ai": f"🤖 Assistant {at_name}",
+                "tool": f"🛠 Tool ({name or 'unknown'})",
+                "function": f"🧮 Function",
+                "system": f"⚙️ System"
+            }.get(role, f"🔹 {role} {at_name}")
 
-#         for msg in self.items:
-#             role = msg.type
-#             name = getattr(msg, "name", None)
-#             at_name = f"@{name}" if name else ""
+            content = (msg.content or "").strip().replace("\n", " ")
+            if truncate:
+                content = content[:truncate] + \
+                    "..." if len(content) > truncate else content
 
-#             prefix = {
-#                 "human": f"👤 User {at_name}",
-#                 "ai": f"🤖 Assistant {at_name}",
-#                 "tool": f"🛠 Tool ({name or 'unknown'})",
-#                 "function": f"🧮 Function",
-#                 "system": f"⚙️ System"
-#             }.get(role, f"🔹 {role} {at_name}")
+            tokens = msg.count_tokens()
+            total_tokens += tokens
 
-#             content = (msg.content or "").strip().replace("\n", " ")
-#             if truncate:
-#                 content = content[:truncate] + \
-#                     "..." if len(content) > truncate else content
+            if role == "ai" and "tool_calls" in msg.additional_kwargs:
+                for call in msg.additional_kwargs["tool_calls"]:
+                    func = call.get("function", {})
+                    tool_name = func.get("name", "unknown")
+                    args = func.get("arguments", "{}")
+                    lines.append(
+                        f"🤖 Assistant called tool: `{tool_name}` with `{args}`")
+                if not content:
+                    continue
 
-#             tokens = msg.count_tokens()
-#             total_tokens += tokens
+            line = f"{prefix}: {content}"
+            if technical:
+                line += f" ({tokens} tokens)"
+            lines.append(line)
 
-#             if role == "ai" and "tool_calls" in msg.additional_kwargs:
-#                 for call in msg.additional_kwargs["tool_calls"]:
-#                     func = call.get("function", {})
-#                     tool_name = func.get("name", "unknown")
-#                     args = func.get("arguments", "{}")
-#                     lines.append(
-#                         f"🤖 Assistant called tool: `{tool_name}` with `{args}`")
-#                 if not content:
-#                     continue
+        header = f"💬 Messages: {len(self.items)}"
+        if technical:
+            header += f", {total_tokens} tokens"
 
-#             line = f"{prefix}: {content}"
-#             if technical:
-#                 line += f" ({tokens} tokens)"
-#             lines.append(line)
+        return header + "\n" + "\n".join(lines)
 
-#         header = f"💬 Messages: {len(self.items)}"
-#         if technical:
-#             header += f", {total_tokens} tokens"
+    def last(self, role: Optional[RoleLiteral] = None) -> Optional[BaseMessage]:
+        if role is None:
+            return self.items[-1] if self.items else None
+        for msg in reversed(self.items):
+            if get_role(msg) == role:
+                return msg
+        return None
 
-#         return header + "\n" + "\n".join(lines)
+    def remove_last(self):
+        if self.items:
+            self.items.pop()
 
-#     def last(self, role: Optional[RoleLiteral] = None) -> Optional[BaseMessage]:
-#         if role is None:
-#             return self.items[-1] if self.items else None
-#         for msg in reversed(self.items):
-#             if get_role(msg) == role:
-#                 return msg
-#         return None
+    def trim(self, first_tokens: int = 50, last_tokens: int = 250) -> List[BaseMessage]:
+        trimmed_first = trim_messages(
+            self.items,
+            max_tokens=first_tokens,
+            strategy="first",
+            token_counter=count_tokens,
+            end_on=("ai", "tool"),
+            allow_partial=True
+        )
+        trimmed_last = trim_messages(
+            self.items,
+            max_tokens=last_tokens,
+            strategy="last",
+            token_counter=count_tokens,
+            start_on="human",
+            end_on=("human", "tool"),
+            include_system=True,
+            allow_partial=True
+        )
+        return trimmed_first + trimmed_last
 
-#     def remove_last(self):
-#         if self.items:
-#             self.items.pop()
-
-#     def trim(self, first_tokens: int = 50, last_tokens: int = 250) -> List[BaseMessage]:
-#         trimmed_first = trim_messages(
-#             self.items,
-#             max_tokens=first_tokens,
-#             strategy="first",
-#             token_counter=count_tokens,
-#             end_on=("ai", "tool"),
-#             allow_partial=True
-#         )
-#         trimmed_last = trim_messages(
-#             self.items,
-#             max_tokens=last_tokens,
-#             strategy="last",
-#             token_counter=count_tokens,
-#             start_on="human",
-#             end_on=("human", "tool"),
-#             include_system=True,
-#             allow_partial=True
-#         )
-#         return trimmed_first + trimmed_last
-
-#     def sender(self, users) -> Optional[Human]:
-#         last_human = self.last("human")
-#         last_any = self.last()
-#         if not last_human or not hasattr(last_human, "name"):
-#             return None
-
-#         username = getattr(last_human, "name", None)
-#         if not username:
-#             return None
-
-#         for user in users:
-#             if user.username == username:
-#                 return user
-#         return None
+    def sender(self, users) -> Optional[Human]:
+        last_human = self.last("human")
+        if not last_human or not hasattr(last_human, "name"):
+            return None
+        username = getattr(last_human, "name", None)
+        if not username:
+            return None
+        for user in users:
+            if user.username == username:
+                return user
+        return None

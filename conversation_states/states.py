@@ -5,7 +5,7 @@ from langgraph.graph import add_messages, MessagesState
 
 import tiktoken
 from .humans import Human
-# from .messages import MessageHistory
+from .messages import MessageAPI
 from .utils.reducers import add_user, add_summary
 
 
@@ -19,10 +19,18 @@ class InternalState(BaseModel):
     last_sender: Human
     summary: str = ""
 
+    @property
+    def reasoning_messages_api(self) -> MessageAPI:
+        return MessageAPI(self, "reasoning_messages")
+
+    @property
+    def external_messages_api(self) -> MessageAPI:
+        return MessageAPI(self, "external_messages")
+
     @classmethod
     def from_external(cls, external: "ExternalState") -> "InternalState":
-        last_message = external.messages.last()
-        sender = external.messages.sender(external.users)
+        last_message = external.messages_api.last()
+        sender = external.messages_api.sender(external.users)
 
         return cls(
             reasoning_messages=[],
@@ -42,14 +50,17 @@ class ExternalState(BaseModel):
     summary: str = ""
     last_internal_state: Optional[InternalState] = None
 
+    @property
+    def messages_api(self) -> MessageAPI:
+        return MessageAPI(self, "messages")
+
     @classmethod
     def from_internal(cls, internal: "InternalState", assistant_message: "AIMessage") -> "ExternalState":
-
         return cls(
-            messages=[*internal.external_messages, assistant_message],
+            messages=[*internal.external_messages_api.items, assistant_message],
             users=list(internal.users),
-            summary=internal.summary,
-            last_internal_state=internal
+            summary=internal.summary
+            # last_internal_state=internal
         )
 
     def clear_state(self):
