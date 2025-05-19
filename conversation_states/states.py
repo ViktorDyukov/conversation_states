@@ -1,20 +1,31 @@
-from typing import Annotated, List, Optional
-from pydantic import BaseModel, Field
-from langchain_core.messages import BaseMessage, RemoveMessage, trim_messages, AnyMessage
-from langgraph.graph import add_messages, MessagesState
-
-import tiktoken
+from __future__ import annotations
+from typing import List, Optional, Annotated, Any, Union, Literal
+from pydantic import BaseModel, Field, model_validator
+from pydantic.type_adapter import TypeAdapter
+from langchain_core.messages import BaseMessage, RemoveMessage, AnyMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langgraph.graph import add_messages
 from .humans import Human
 from .messages import MessageAPI
-from .utils.reducers import add_user, add_summary
+from .utils.reducers import add_user
+
+
+MyAnyMessage = Annotated[
+    Union[
+        HumanMessage,
+        AIMessage,
+        SystemMessage,
+        ToolMessage
+    ],
+    Field(discriminator="type")
+]
 
 
 class InternalState(BaseModel):
-    reasoning_messages: Annotated[List[AnyMessage], add_messages] = Field(
+    reasoning_messages: Annotated[List[MyAnyMessage], add_messages] = Field(
         default_factory=list)
-    external_messages: Annotated[List[AnyMessage], add_messages] = Field(
+    external_messages: Annotated[List[MyAnyMessage], add_messages] = Field(
         default_factory=list)
-    last_external_message: BaseMessage
+    last_external_message: MyAnyMessage
     users: Annotated[list[Human], add_user] = Field(default_factory=list)
     last_sender: Human
     summary: str = ""
@@ -41,9 +52,36 @@ class InternalState(BaseModel):
             last_sender=sender
         )
 
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_union(cls, values: dict) -> dict:
+        print("CUSTOM VALIDATOR - INT  >>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
+        print(values)
+        print(">>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
+        for field in ["reasoning_messages", "external_messages"]:
+            if field in values:
+                values[field] = [
+                    TypeAdapter(AnyMessage).validate_python(m)
+                    for m in values[field]
+                ]
+        return values
+
+    @classmethod
+    def from_raw(cls, data: dict) -> "InternalState":
+        print("FROM RAW - INT  >>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
+        print(values)
+        print(">>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
+        for field in ["reasoning_messages", "external_messages"]:
+            if field in data:
+                data[field] = [
+                    TypeAdapter(AnyMessage).validate_python(m)
+                    for m in data[field]
+                ]
+        return cls(**data)
+
 
 class ExternalState(BaseModel):
-    messages: Annotated[List[AnyMessage], add_messages] = Field(
+    messages: Annotated[List[MyAnyMessage], add_messages] = Field(
         default_factory=list)
     users: Annotated[list[Human], add_user] = Field(
         default_factory=list)
@@ -59,9 +97,23 @@ class ExternalState(BaseModel):
         return cls(
             messages=[*internal.external_messages_api.items, assistant_message],
             users=list(internal.users),
-            summary=internal.summary
-            # last_internal_state=internal
+            summary=internal.summary,
+            last_internal_state=None
         )
+
+    @model_validator(mode="before")
+    @classmethod
+    def resolve_union(cls, values: dict) -> dict:
+        print("CUSTOM VALIDATOR - EXT  >>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
+        print(values)
+        print(">>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
+
+        if "messages" in values:
+            values["messages"] = [
+                TypeAdapter(AnyMessage).validate_python(m)
+                for m in values["messages"]
+            ]
+        return values
 
     def clear_state(self):
         removed = [RemoveMessage(id=m.id)
