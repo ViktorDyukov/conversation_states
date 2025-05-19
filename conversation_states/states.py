@@ -1,31 +1,20 @@
 from __future__ import annotations
-from typing import List, Optional, Annotated, Any, Union, Literal
+from typing import List, Optional, Annotated
 from pydantic import BaseModel, Field, model_validator
 from pydantic.type_adapter import TypeAdapter
-from langchain_core.messages import BaseMessage, RemoveMessage, AnyMessage, AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import BaseMessage, RemoveMessage, AnyMessage, AIMessage
 from langgraph.graph import add_messages
 from .humans import Human
-from .messages import MessageAPI
+from .messages import MessageAPI, count_tokens
 from .utils.reducers import add_user
 
 
-MyAnyMessage = Annotated[
-    Union[
-        HumanMessage,
-        AIMessage,
-        SystemMessage,
-        ToolMessage
-    ],
-    Field(discriminator="type")
-]
-
-
 class InternalState(BaseModel):
-    reasoning_messages: Annotated[List[MyAnyMessage], add_messages] = Field(
+    reasoning_messages: Annotated[List[AnyMessage], add_messages] = Field(
         default_factory=list)
-    external_messages: Annotated[List[MyAnyMessage], add_messages] = Field(
+    external_messages: Annotated[List[AnyMessage], add_messages] = Field(
         default_factory=list)
-    last_external_message: MyAnyMessage
+    last_external_message: AnyMessage
     users: Annotated[list[Human], add_user] = Field(default_factory=list)
     last_sender: Human
     summary: str = ""
@@ -55,9 +44,6 @@ class InternalState(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def resolve_union(cls, values: dict) -> dict:
-        print("CUSTOM VALIDATOR - INT  >>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
-        print(values)
-        print(">>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
         for field in ["reasoning_messages", "external_messages"]:
             if field in values:
                 values[field] = [
@@ -66,22 +52,9 @@ class InternalState(BaseModel):
                 ]
         return values
 
-    @classmethod
-    def from_raw(cls, data: dict) -> "InternalState":
-        print("FROM RAW - INT  >>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
-        print(values)
-        print(">>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
-        for field in ["reasoning_messages", "external_messages"]:
-            if field in data:
-                data[field] = [
-                    TypeAdapter(AnyMessage).validate_python(m)
-                    for m in data[field]
-                ]
-        return cls(**data)
-
 
 class ExternalState(BaseModel):
-    messages: Annotated[List[MyAnyMessage], add_messages] = Field(
+    messages: Annotated[List[AnyMessage], add_messages] = Field(
         default_factory=list)
     users: Annotated[list[Human], add_user] = Field(
         default_factory=list)
@@ -95,19 +68,15 @@ class ExternalState(BaseModel):
     @classmethod
     def from_internal(cls, internal: "InternalState", assistant_message: "AIMessage") -> "ExternalState":
         return cls(
-            messages=[*internal.external_messages_api.items, assistant_message],
+            messages=[*internal.external_messages, assistant_message],
             users=list(internal.users),
             summary=internal.summary,
-            last_internal_state=None
+            last_internal_state=internal
         )
 
     @model_validator(mode="before")
     @classmethod
     def resolve_union(cls, values: dict) -> dict:
-        print("CUSTOM VALIDATOR - EXT  >>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
-        print(values)
-        print(">>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n>>>>>> \n")
-
         if "messages" in values:
             values["messages"] = [
                 TypeAdapter(AnyMessage).validate_python(m)
@@ -121,6 +90,7 @@ class ExternalState(BaseModel):
         self.messages = removed
         self.summary = ""
         self.users = []
+        self.last_internal_state = None
         return
 
     def summarize_overall_state(self) -> str:
@@ -139,17 +109,12 @@ class ExternalState(BaseModel):
             users_block = "👤 Users: none"
 
         # 2. Messages (with formatting function)
-        messages = self.messages
-        messages_block = self.format_messages_block(
-            messages=messages,
-            technical_details=True,
-            truncate_chars=100
-        )
+        messages_block = self.messages_api.as_pretty()
 
         # 3. Summary
         if self.summary:
             summary_text = self.summary.strip()
-            summary_tokens = self.count_tokens(summary_text)
+            summary_tokens = count_tokens(summary_text)
         else:
             summary_text = "(No summary provided)"
             summary_tokens = 0

@@ -1,6 +1,5 @@
-from typing import Literal, Optional, List, Dict, Callable, Tuple, Union, Annotated, Any, Sequence, TypedDict
-from pydantic import BaseModel, Field, model_validator, TypeAdapter
-from langchain_core.messages.utils import _get_type
+from typing import Literal, Optional, List
+from pydantic import BaseModel
 from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
@@ -8,21 +7,22 @@ from langchain_core.messages import (
     ToolMessage,
     SystemMessage,
     AnyMessage,
-    trim_messages
+    trim_messages,
+    RemoveMessage
 )
-from langgraph.graph import add_messages, MessagesState
 import tiktoken
 from .humans import Human
-from pydantic import Discriminator, Field, Tag
 
 
 RoleLiteral = Literal["human", "ai", "tool", "system", "unknown"]
 
 
-def count_tokens(self) -> int:
+def count_tokens(msg) -> int:
     tokenizer = tiktoken.encoding_for_model("gpt-4")
-    content = getattr(self, "content", "")
-    return len(tokenizer.encode(content or ""))
+    content = getattr(msg, "content", "")
+    if not isinstance(content, str):
+        content = str(content)
+    return len(tokenizer.encode(content))
 
 
 def get_role(msg: BaseMessage) -> RoleLiteral:
@@ -72,7 +72,7 @@ class MessageAPI:
                 content = content[:truncate] + \
                     "..." if len(content) > truncate else content
 
-            tokens = msg.count_tokens()
+            tokens = count_tokens(msg)
             total_tokens += tokens
 
             if role == "ai" and "tool_calls" in msg.additional_kwargs:
@@ -96,17 +96,26 @@ class MessageAPI:
 
         return header + "\n" + "\n".join(lines)
 
-    def last(self, role: Optional[RoleLiteral] = None) -> Optional[BaseMessage]:
-        if role is None:
+    def last(self, role: Optional[RoleLiteral] = None, name: Optional[str] = None) -> Optional[BaseMessage]:
+        if role is not None and name is not None:
+            raise ValueError(
+                "Only one of 'role' or 'name' should be provided.")
+
+        if role is None and name is None:
             return self.items[-1] if self.items else None
+
         for msg in reversed(self.items):
-            if get_role(msg) == role:
+            if role is not None and get_role(msg) == role:
+                return msg
+            if name is not None and getattr(msg, "name", None) == name:
                 return msg
         return None
 
     def remove_last(self):
-        if self.items:
-            self.items.pop()
+        for msg in reversed(self.items):
+            if hasattr(msg, "id") and msg.id:
+                self.items.append(RemoveMessage(id=msg.id))
+                return
 
     def trim(self, first_tokens: int = 50, last_tokens: int = 250) -> List[BaseMessage]:
         trimmed_first = trim_messages(
@@ -130,7 +139,7 @@ class MessageAPI:
         return trimmed_first + trimmed_last
 
     def sender(self, users) -> Optional[Human]:
-        last_human = self.last("human")
+        last_human = self.last(role="human")
         if not last_human or not hasattr(last_human, "name"):
             return None
         username = getattr(last_human, "name", None)
