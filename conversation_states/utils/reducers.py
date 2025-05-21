@@ -19,3 +19,13 @@ def add_user(left: list["Human"], right: list["Human"]) -> list["Human"]:
 
     existing_ids = {u.username for u in left}
     return left + [u for u in right if u.username not in existing_ids]
+
+
+def add_internal_state(a: Optional["InternalState"], b: Optional["InternalState"]) -> Optional["InternalState"]:
+    if a is None and b is None:
+        return None
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return b

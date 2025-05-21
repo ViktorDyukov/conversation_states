@@ -6,13 +6,13 @@ from langchain_core.messages import BaseMessage, RemoveMessage, AnyMessage, AIMe
 from langgraph.graph import add_messages
 from .humans import Human
 from .messages import MessageAPI, count_tokens
-from .utils.reducers import add_user
+from .utils.reducers import add_user, add_internal_state
 
 
 class InternalState(BaseModel):
     reasoning_messages: Annotated[List[AnyMessage], add_messages] = Field(
         default_factory=list)
-    external_messages: Annotated[List[AnyMessage], add_messages] = Field(
+    external_messages: List[AnyMessage] = Field(
         default_factory=list)
     last_external_message: AnyMessage
     users: Annotated[list[Human], add_user] = Field(default_factory=list)
@@ -59,7 +59,12 @@ class ExternalState(BaseModel):
     users: Annotated[list[Human], add_user] = Field(
         default_factory=list)
     summary: str = ""
-    last_internal_state: Optional[InternalState] = None
+    last_reasoning: Annotated[List[AnyMessage], add_messages] = Field(
+        default_factory=list)
+
+    @property
+    def last_reasoning_api(self) -> MessageAPI:
+        return MessageAPI(self, "last_reasoning")
 
     @property
     def messages_api(self) -> MessageAPI:
@@ -68,10 +73,10 @@ class ExternalState(BaseModel):
     @classmethod
     def from_internal(cls, internal: "InternalState", assistant_message: "AIMessage") -> "ExternalState":
         return cls(
-            messages=[*internal.external_messages, assistant_message],
+            messages=[assistant_message],
             users=list(internal.users),
             summary=internal.summary,
-            last_internal_state=internal
+            last_reasoning=internal.reasoning_messages
         )
 
     @model_validator(mode="before")
@@ -90,7 +95,7 @@ class ExternalState(BaseModel):
         self.messages = removed
         self.summary = ""
         self.users = []
-        self.last_internal_state = None
+        self.last_reasoning = []
         return
 
     def summarize_overall_state(self) -> str:
@@ -123,36 +128,8 @@ class ExternalState(BaseModel):
         return f"{users_block}\n\n{messages_block}\n\n{summary_block}"
 
     def show_last_reasoning(self) -> str:
-        if not self.messages:
+        api = self.last_reasoning_api
+        if not api:
             return "No messages available."
 
-        # Group into turns
-        turns = []
-        current_turn = []
-
-        for msg in self.messages:
-            if msg.type == "human":
-                if current_turn:
-                    turns.append(current_turn)
-                current_turn = [msg]
-            else:
-                if current_turn:
-                    current_turn.append(msg)
-
-        if current_turn:
-            turns.append(current_turn)
-
-        if not turns:
-            return "No complete turn found."
-
-        last_turn = turns[-1]
-
-        formatted = self.format_messages_block(
-            messages=last_turn,
-            technical_details=True,
-            truncate_chars=100
-        )
-
-        return f"🧵 Last turn:\n\n{formatted}"
-
-    # from internal
+        return f"🧵 Last turn:\n\n{api.as_pretty(truncate=1500)}"
