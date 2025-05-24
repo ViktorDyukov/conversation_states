@@ -6,7 +6,7 @@ from langchain_core.messages import BaseMessage, RemoveMessage, AnyMessage, AIMe
 from langgraph.graph import add_messages
 from .humans import Human
 from .messages import MessageAPI, count_tokens
-from .utils.reducers import add_user, manage_state
+from conversation_states.utils.reducers import add_user, manage_state
 
 
 class InternalState(BaseModel):
