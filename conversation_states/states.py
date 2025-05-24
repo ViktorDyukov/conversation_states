@@ -6,7 +6,7 @@ from langchain_core.messages import BaseMessage, RemoveMessage, AnyMessage, AIMe
 from langgraph.graph import add_messages
 from .humans import Human
 from .messages import MessageAPI, count_tokens
-from .utils.reducers import add_user, add_internal_state
+from .utils.reducers import add_user, manage_state
 
 
 class InternalState(BaseModel):
@@ -59,8 +59,8 @@ class ExternalState(BaseModel):
     users: Annotated[list[Human], add_user] = Field(
         default_factory=list)
     summary: str = ""
-    last_reasoning: Annotated[List[AnyMessage], add_messages] = Field(
-        default_factory=list)
+    last_reasoning: Annotated[Optional[list[AnyMessage]],
+                              manage_state] = Field(default=None)
 
     @property
     def last_reasoning_api(self) -> MessageAPI:
@@ -128,8 +128,7 @@ class ExternalState(BaseModel):
         return f"{users_block}\n\n{messages_block}\n\n{summary_block}"
 
     def show_last_reasoning(self) -> str:
-        api = self.last_reasoning_api
-        if not api:
+        if not self.last_reasoning:
             return "No messages available."
-
-        return f"🧵 Last turn:\n\n{api.as_pretty(truncate=1500)}"
+        api = self.last_reasoning_api
+        return api.as_pretty(truncate=1500)

@@ -61,7 +61,7 @@ class MessageAPI:
 
             prefix = {
                 "human": f"👤 User {at_name}",
-                "ai": f"🤖 Assistant {at_name}",
+                "ai": f"🤖 Assistant ({name})",
                 "tool": f"🛠 Tool ({name or 'unknown'})",
                 "function": f"🧮 Function",
                 "system": f"⚙️ System"
@@ -85,14 +85,15 @@ class MessageAPI:
                 if not content:
                     continue
 
-            line = f"{prefix}: {content}"
             if technical:
-                line += f" ({tokens} tokens)"
+                prefix += f" ({tokens} tokens)"
+            line = f"{prefix}: <blockquote>{content}</blockquote>\n"
             lines.append(line)
 
-        header = f"💬 Messages: {len(self.items)}"
+        header = f"Messages: {len(self.items)}"
         if technical:
             header += f", {total_tokens} tokens"
+        header += "\n"
 
         return header + "\n" + "\n".join(lines)
 

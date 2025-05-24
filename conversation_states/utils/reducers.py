@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, Union, Any
 from conversation_states.humans import Human
 
 
@@ -21,11 +21,16 @@ def add_user(left: list["Human"], right: list["Human"]) -> list["Human"]:
     return left + [u for u in right if u.username not in existing_ids]
 
 
-def add_internal_state(a: Optional["InternalState"], b: Optional["InternalState"]) -> Optional["InternalState"]:
-    if a is None and b is None:
+def manage_state(
+    a: Optional[Union["InternalState", list[Any]]],
+    b: Optional[Union["InternalState", list[Any]]]
+) -> Optional[Union["InternalState", list[Any]]]:
+    def is_empty(val):
+        return val is None or val == []
+    if is_empty(a) and is_empty(b):
         return None
-    if a is None:
+    if is_empty(a):
         return b
-    if b is None:
+    if is_empty(b):
         return a
     return b
