@@ -1,4 +1,4 @@
-from typing import Literal, Optional, List
+from typing import Literal, Optional, List, Union
 from pydantic import BaseModel
 from langchain_core.messages import (
     BaseMessage,
@@ -12,6 +12,9 @@ from langchain_core.messages import (
 )
 import tiktoken
 from .humans import Human
+
+
+CountType = Union[int, Literal["all"], None]
 
 
 RoleLiteral = Literal["human", "ai", "tool", "system", "unknown"]
