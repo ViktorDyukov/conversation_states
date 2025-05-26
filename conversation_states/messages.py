@@ -97,20 +97,36 @@ class MessageAPI:
 
         return header + "\n" + "\n".join(lines)
 
-    def last(self, role: Optional[RoleLiteral] = None, name: Optional[str] = None) -> Optional[BaseMessage]:
-        if role is not None and name is not None:
-            raise ValueError(
-                "Only one of 'role' or 'name' should be provided.")
+    def last(
+        self,
+        role: Optional[RoleLiteral] = None,
+        name: Optional[str] = None,
+        count: CountType = None
+    ) -> list[BaseMessage]:
 
+        # Приведение count к числу
+        if count is None:
+            count = 1
+
+        # Без фильтра: просто берем из self.items
         if role is None and name is None:
-            return self.items[-1] if self.items else None
+            if not self.items:
+                return []
+            if count == "all":
+                return list(self.items)
+            return self.items[-count:]
 
+        # С фильтром: собираем подходящие
+        filtered = []
         for msg in reversed(self.items):
             if role is not None and get_role(msg) == role:
-                return msg
-            if name is not None and getattr(msg, "name", None) == name:
-                return msg
-        return None
+                filtered.append(msg)
+            elif name is not None and getattr(msg, "name", None) == name:
+                filtered.append(msg)
+            if count != "all" and len(filtered) >= count:
+                break
+
+        return list(reversed(filtered))
 
     def remove_last(self):
         for msg in reversed(self.items):
