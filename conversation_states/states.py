@@ -29,7 +29,7 @@ class InternalState(BaseModel):
 
     @classmethod
     def from_external(cls, external: "ExternalState") -> "InternalState":
-        last_message = external.messages_api.last()
+        [last_message] = external.messages_api.last()
         sender = external.messages_api.sender(external.users)
 
         return cls(
