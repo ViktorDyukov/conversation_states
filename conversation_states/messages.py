@@ -96,6 +96,7 @@ class MessageAPI:
         if technical:
             header += f", {total_tokens} tokens"
         header += "\n"
+        print(header + "\n" + "\n".join(lines))
 
         return header + "\n" + "\n".join(lines)
 
