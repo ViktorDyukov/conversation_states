@@ -16,7 +16,6 @@ from .humans import Human
 
 CountType = Union[int, Literal["all"], None]
 
-
 RoleLiteral = Literal["human", "ai", "tool", "system", "unknown"]
 
 
@@ -159,7 +158,7 @@ class MessageAPI:
         return trimmed_first + trimmed_last
 
     def sender(self, users) -> Optional[Human]:
-        last_human = self.last(role="human")
+        [last_human] = self.last(role="human")
         if not last_human or not hasattr(last_human, "name"):
             return None
         username = getattr(last_human, "name", None)
